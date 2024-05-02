@@ -20,9 +20,9 @@ enum GameState {
 impl Debug for CellValue {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            CellValue::Empty => return write!(f, "▢"),
-            CellValue::NearMine(v) => return write!(f, "{}", v),
-            CellValue::Mine => return write!(f, "◉"),
+            CellValue::Empty => return write!(f, "  "),
+            CellValue::NearMine(v) => return write!(f, " {}", v),
+            CellValue::Mine => return write!(f, "💥"),
         };
     }
 }
@@ -37,7 +37,7 @@ impl Debug for Cell {
         if self.is_revealed {
             return write!(f, "{:?}", self.value);
         } else {
-            return write!(f, "▦");
+            return write!(f, "⬜");
         }
     }
 }
@@ -55,14 +55,13 @@ type MineGrid = Vec<Vec<Cell>>;
 
 fn main() {
     const GRID_SIZE: usize = 10;
-    const MINE_COUNT: usize = 3;
+    const MINE_COUNT: usize = 30;
 
     let mut _game_state = GameState::Playing;
 
     let mut grid: MineGrid = generate_empty_grid(GRID_SIZE);
     place_mines_in_grid(&mut grid, MINE_COUNT, GRID_SIZE);
     count_nearby_mines(&mut grid, GRID_SIZE);
-    print_grid(&grid);
 
     let found_mine = reveal_cell(1, 1, &mut grid);
 
