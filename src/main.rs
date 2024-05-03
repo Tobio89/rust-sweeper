@@ -167,10 +167,28 @@ fn count_nearby_mines(grid: &mut MineGrid, grid_size: usize) {
 }
 
 fn print_grid(grid: &MineGrid) {
-    for g in grid {
-        println!("{:?}", g);
+    // for g in grid {
+    //     println!("{:?}", g);
+    // }
+    // println!("-------");
+    let mut result = String::new();
+
+    for row in grid {
+        for cell in row {
+            if !cell.is_revealed {
+                result.push_str("⬜");
+            } else {
+                match cell.value {
+                    CellValue::Empty => result.push_str("  "),
+                    CellValue::Mine => result.push_str("💥"),
+                    CellValue::NearMine(num) => result = format!("{} {}", result, num),
+                }
+            }
+        }
+        result.push_str("\n");
     }
-    println!("-------");
+
+    println!("{}", result);
 }
 
 fn clamp(x: i64, min: i64, max: i64) -> usize {
