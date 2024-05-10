@@ -1,5 +1,6 @@
-use std::fmt;
 use std::fmt::Debug;
+use std::num::ParseIntError;
+use std::{fmt, io};
 
 use clap::{Args, Parser, Subcommand};
 use rand::Rng;
@@ -14,7 +15,7 @@ enum CellValue {
 #[derive(Debug)]
 enum GameState {
     Playing,
-    // Won,
+    Won,
     Lost,
 }
 
@@ -108,21 +109,127 @@ fn main() {
     let GRID_SIZE = GRID_SIZE;
     let MINE_COUNT = MINE_COUNT;
 
-    let mut _game_state = GameState::Playing;
+    let cells_to_reveal: usize = (GRID_SIZE * GRID_SIZE) - MINE_COUNT;
+
+    let mut game_state = GameState::Playing;
+    let mut cells_revealed: usize = 0;
 
     let mut grid: MineGrid = generate_empty_grid(GRID_SIZE);
     place_mines_in_grid(&mut grid, MINE_COUNT, GRID_SIZE);
     count_nearby_mines(&mut grid, GRID_SIZE);
+    println!("Enter X and Y co-ords to reveal that cell");
+    println!("e.g: 10 10");
+    loop {
+        print_grid(&grid);
 
-    let found_mine = reveal_cell(1, 1, &mut grid);
+        let mut buffer = String::new();
+        io::stdin().read_line(&mut buffer).unwrap();
 
-    if found_mine {
-        _game_state = GameState::Lost;
-        println!("mine");
-    } else {
-        println!("not mine");
+        let user_input = parse_input(&buffer, GRID_SIZE);
+
+        let reveal_x: usize;
+        let reveal_y: usize;
+
+        match user_input {
+            UserInput::BadInput(msg) => {
+                println!("Whoops!: {}", msg);
+                continue;
+            }
+            UserInput::Coords(x, y) => {
+                reveal_x = x;
+                reveal_y = y;
+            }
+        }
+
+        let found_mine = reveal_cell(reveal_x, reveal_y, &mut grid, &mut cells_revealed);
+
+        if cells_revealed >= cells_to_reveal {
+            game_state = GameState::Won
+        }
+
+        if found_mine {
+            game_state = GameState::Lost;
+        }
+
+        match game_state {
+            GameState::Lost => {
+                print_grid(&grid);
+                println!("YOU LOSE");
+                break;
+            }
+
+            GameState::Won => {
+                print_grid(&grid);
+                println!("All mines safely located! YOU WIN");
+                break;
+            }
+
+            GameState::Playing => {
+                print!("{}[2J", 27 as char);
+                println!(
+                    "Revealed {} out of {} so far",
+                    cells_revealed, cells_to_reveal
+                );
+                continue;
+            }
+        }
     }
-    print_grid(&grid);
+}
+
+enum UserInput {
+    BadInput(String),
+    Coords(usize, usize),
+}
+
+fn parse_input(input_buffer: &String, size: usize) -> UserInput {
+    if (input_buffer.len() <= 0) {
+        return UserInput::BadInput(String::from("No input"));
+    }
+
+    let parts: Vec<&str> = input_buffer.split(" ").collect();
+    if parts.len() <= 1 {
+        return UserInput::BadInput(String::from("Not enough co-ords"));
+    }
+    if parts.len() > 2 {
+        return UserInput::BadInput(String::from("Too many co-ords"));
+    }
+
+    let input_x: Result<usize, ParseIntError> = parts[0].parse();
+    let input_y: Result<usize, ParseIntError> = parts[1].strip_suffix("\n").unwrap().parse();
+
+    let user_x: usize;
+    let user_y: usize;
+
+    match input_x {
+        Ok(number) => {
+            user_x = number;
+        }
+        Err(_) => {
+            return UserInput::BadInput(String::from("x value was not a valid number"));
+        }
+    }
+
+    match input_y {
+        Ok(number) => {
+            user_y = number;
+        }
+        Err(_) => {
+            return UserInput::BadInput(String::from("y value was not a valid number"));
+        }
+    }
+
+    if user_x > size || user_y > size {
+        return UserInput::BadInput(String::from(
+            "co-ord values must be within the size of the grid!",
+        ));
+    }
+    if user_x <= 0 || user_y <= 0 {
+        return UserInput::BadInput(String::from(
+            "co-ord values must be within the size of the grid!",
+        ));
+    }
+
+    return UserInput::Coords(user_x - 1, user_y - 1);
 }
 
 fn generate_empty_grid(size: usize) -> MineGrid {
@@ -220,7 +327,29 @@ fn count_nearby_mines(grid: &mut MineGrid, grid_size: usize) {
 fn print_grid(grid: &MineGrid) {
     let mut result = String::new();
 
-    for row in grid {
+    let size = grid.len();
+
+    for n in 0..size + 1 {
+        if n == 0 {
+            result.push_str(" 0");
+            continue;
+        }
+        if n < 10 {
+            result = format!("{} {}", result, n);
+            continue;
+        }
+        result = format!("{}{}", result, n);
+    }
+    result.push_str("\n");
+
+    for n in 0..size {
+        let row = &grid[n];
+        if (n + 1) < 10 {
+            result = format!("{} {}", result, n + 1);
+        } else {
+            result = format!("{}{}", result, n + 1);
+        }
+
         for cell in row {
             if !cell.is_revealed {
                 result.push_str("⬜");
@@ -248,7 +377,7 @@ fn clamp(x: i64, min: i64, max: i64) -> usize {
     x as usize
 }
 
-fn recursive_reveal(selected_x: usize, selected_y: usize, grid: &mut MineGrid) {
+fn recursive_reveal(selected_x: usize, selected_y: usize, grid: &mut MineGrid) -> usize {
     let size: i64 = grid.len().try_into().unwrap();
 
     let i_x: i64 = selected_x.try_into().unwrap();
@@ -260,6 +389,8 @@ fn recursive_reveal(selected_x: usize, selected_y: usize, grid: &mut MineGrid) {
     let y_min = clamp(i_y - 1, 0, size - 1);
     let y_max = clamp(i_y + 1, 0, size - 1);
 
+    let mut revealed: usize = 0;
+
     for i in x_min..x_max + 1 {
         for j in y_min..y_max + 1 {
             if i == selected_x && j == selected_y {
@@ -270,17 +401,28 @@ fn recursive_reveal(selected_x: usize, selected_y: usize, grid: &mut MineGrid) {
             }
             match grid[i][j].value {
                 CellValue::Mine => continue,
-                CellValue::NearMine(_) => grid[i][j].is_revealed = true,
+                CellValue::NearMine(_) => {
+                    grid[i][j].is_revealed = true;
+                    revealed += 1;
+                }
                 CellValue::Empty => {
                     grid[i][j].is_revealed = true;
-                    recursive_reveal(i, j, grid);
+                    revealed += 1;
+                    revealed += recursive_reveal(i, j, grid);
                 }
             }
         }
     }
+
+    return revealed;
 }
 
-fn reveal_cell(reveal_x: usize, reveal_y: usize, grid: &mut MineGrid) -> bool {
+fn reveal_cell(
+    reveal_x: usize,
+    reveal_y: usize,
+    grid: &mut MineGrid,
+    cells_revealed: &mut usize,
+) -> bool {
     let mut cell = grid[reveal_x][reveal_y];
     cell.is_revealed = true;
 
@@ -291,7 +433,7 @@ fn reveal_cell(reveal_x: usize, reveal_y: usize, grid: &mut MineGrid) -> bool {
             return true;
         }
         _rest => {
-            recursive_reveal(reveal_x, reveal_y, grid);
+            *cells_revealed = *cells_revealed + recursive_reveal(reveal_x, reveal_y, grid);
             return false;
         }
     }
