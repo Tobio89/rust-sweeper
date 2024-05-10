@@ -1,6 +1,7 @@
 use std::fmt;
 use std::fmt::Debug;
 
+use clap::{Args, Parser, Subcommand};
 use rand::Rng;
 
 #[derive(Copy, Clone)]
@@ -53,9 +54,59 @@ impl Cell {
 
 type MineGrid = Vec<Vec<Cell>>;
 
+#[derive(Parser)]
+#[command(version, about, long_about = None)]
+#[command(propagate_version = true)]
+struct Cli {
+    #[command(subcommand)]
+    game: GameOptions,
+}
+
+#[derive(Subcommand)]
+enum GameOptions {
+    /// 10x10 board with 10 mines
+    Easy,
+    /// 16x16 board with 40 mines
+    Medium,
+    /// 30x30 board with 99 mines
+    Hard,
+    /// <SIZE> <MINES>, generate a board of SIZExSIZE, with MINES number of mines
+    Custom(CustomArgs),
+}
+
+#[derive(Args)]
+struct CustomArgs {
+    size: usize,
+    num_mines: usize,
+}
+
 fn main() {
-    const GRID_SIZE: usize = 10;
-    const MINE_COUNT: usize = 30;
+    let cli = Cli::parse();
+
+    let mut GRID_SIZE: usize = 0;
+    let mut MINE_COUNT: usize = 0;
+
+    match cli.game {
+        GameOptions::Easy => {
+            GRID_SIZE = 10;
+            MINE_COUNT = 10;
+        }
+        GameOptions::Medium => {
+            GRID_SIZE = 16;
+            MINE_COUNT = 40;
+        }
+        GameOptions::Hard => {
+            GRID_SIZE = 30;
+            MINE_COUNT = 99;
+        }
+        GameOptions::Custom(args) => {
+            GRID_SIZE = args.size;
+            MINE_COUNT = args.num_mines;
+        }
+    }
+
+    let GRID_SIZE = GRID_SIZE;
+    let MINE_COUNT = MINE_COUNT;
 
     let mut _game_state = GameState::Playing;
 
@@ -167,10 +218,6 @@ fn count_nearby_mines(grid: &mut MineGrid, grid_size: usize) {
 }
 
 fn print_grid(grid: &MineGrid) {
-    // for g in grid {
-    //     println!("{:?}", g);
-    // }
-    // println!("-------");
     let mut result = String::new();
 
     for row in grid {
