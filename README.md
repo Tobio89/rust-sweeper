@@ -1,6 +1,15 @@
 # Rust-Sweeper
 It's CLI Minesweeper, in Rust!
 
+![image](https://github.com/Tobio89/rust-sweeper/assets/44494591/07438842-cae0-4daf-a0d1-c02dc1bbc8df)
+
+![image](https://github.com/Tobio89/rust-sweeper/assets/44494591/54a3af9a-0b8c-429b-acb7-c75cd33ac01c)
+
+![image](https://github.com/Tobio89/rust-sweeper/assets/44494591/a4bf2bcc-1bdb-4bbc-b381-bef55a5fa9af)
+
+
+
+
 ```
 Usage: minesweeper <COMMAND>
 
