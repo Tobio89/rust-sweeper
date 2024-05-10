@@ -3,6 +3,7 @@ use std::num::ParseIntError;
 use std::{fmt, io};
 
 use clap::{Args, Parser, Subcommand};
+use colored::Colorize;
 use rand::Rng;
 
 #[derive(Copy, Clone)]
@@ -117,8 +118,8 @@ fn main() {
     let mut grid: MineGrid = generate_empty_grid(GRID_SIZE);
     place_mines_in_grid(&mut grid, MINE_COUNT, GRID_SIZE);
     count_nearby_mines(&mut grid, GRID_SIZE);
-    println!("Enter X and Y co-ords to reveal that cell");
-    println!("e.g: 10 10");
+    println!("{}", "Enter X and Y co-ords to reveal that cell".yellow());
+    println!("{}", "e.g: 10 10".yellow());
     loop {
         print_grid(&grid);
 
@@ -141,26 +142,27 @@ fn main() {
             }
         }
 
-        let found_mine = reveal_cell(reveal_x, reveal_y, &mut grid, &mut cells_revealed);
-
-        if cells_revealed >= cells_to_reveal {
-            game_state = GameState::Won
-        }
-
+        let found_mine = reveal_cell(reveal_x, reveal_y, &mut grid);
+        cells_revealed = count_cells(&grid);
         if found_mine {
             game_state = GameState::Lost;
+        } else if cells_revealed >= cells_to_reveal {
+            game_state = GameState::Won;
         }
 
         match game_state {
             GameState::Lost => {
                 print_grid(&grid);
-                println!("YOU LOSE");
+                println!("{}", "  YOU LOSE!!  ".black().on_red());
                 break;
             }
 
             GameState::Won => {
                 print_grid(&grid);
-                println!("All mines safely located! YOU WIN");
+                println!(
+                    "{}",
+                    "  All mines safely located! YOU WIN!! ".black().on_cyan()
+                );
                 break;
             }
 
@@ -194,8 +196,8 @@ fn parse_input(input_buffer: &String, size: usize) -> UserInput {
         return UserInput::BadInput(String::from("Too many co-ords"));
     }
 
-    let input_x: Result<usize, ParseIntError> = parts[0].parse();
-    let input_y: Result<usize, ParseIntError> = parts[1].strip_suffix("\n").unwrap().parse();
+    let input_y: Result<usize, ParseIntError> = parts[0].parse();
+    let input_x: Result<usize, ParseIntError> = parts[1].strip_suffix("\n").unwrap().parse();
 
     let user_x: usize;
     let user_y: usize;
@@ -335,19 +337,23 @@ fn print_grid(grid: &MineGrid) {
             continue;
         }
         if n < 10 {
-            result = format!("{} {}", result, n);
+            let current = format!("{}", n).red();
+            result = format!("{} {}", result, current);
             continue;
         }
-        result = format!("{}{}", result, n);
+        let current = format!("{}", n).red();
+        result = format!("{}{}", result, current);
     }
     result.push_str("\n");
 
     for n in 0..size {
         let row = &grid[n];
         if (n + 1) < 10 {
-            result = format!("{} {}", result, n + 1);
+            let current = format!("{}", n + 1).blue();
+            result = format!("{} {}", result, current);
         } else {
-            result = format!("{}{}", result, n + 1);
+            let current = format!("{}", n + 1).blue();
+            result = format!("{}{}", result, current);
         }
 
         for cell in row {
@@ -377,7 +383,7 @@ fn clamp(x: i64, min: i64, max: i64) -> usize {
     x as usize
 }
 
-fn recursive_reveal(selected_x: usize, selected_y: usize, grid: &mut MineGrid) -> usize {
+fn recursive_reveal(selected_x: usize, selected_y: usize, grid: &mut MineGrid) {
     let size: i64 = grid.len().try_into().unwrap();
 
     let i_x: i64 = selected_x.try_into().unwrap();
@@ -388,8 +394,6 @@ fn recursive_reveal(selected_x: usize, selected_y: usize, grid: &mut MineGrid) -
 
     let y_min = clamp(i_y - 1, 0, size - 1);
     let y_max = clamp(i_y + 1, 0, size - 1);
-
-    let mut revealed: usize = 0;
 
     for i in x_min..x_max + 1 {
         for j in y_min..y_max + 1 {
@@ -403,26 +407,17 @@ fn recursive_reveal(selected_x: usize, selected_y: usize, grid: &mut MineGrid) -
                 CellValue::Mine => continue,
                 CellValue::NearMine(_) => {
                     grid[i][j].is_revealed = true;
-                    revealed += 1;
                 }
                 CellValue::Empty => {
                     grid[i][j].is_revealed = true;
-                    revealed += 1;
-                    revealed += recursive_reveal(i, j, grid);
+                    recursive_reveal(i, j, grid);
                 }
             }
         }
     }
-
-    return revealed;
 }
 
-fn reveal_cell(
-    reveal_x: usize,
-    reveal_y: usize,
-    grid: &mut MineGrid,
-    cells_revealed: &mut usize,
-) -> bool {
+fn reveal_cell(reveal_x: usize, reveal_y: usize, grid: &mut MineGrid) -> bool {
     let mut cell = grid[reveal_x][reveal_y];
     cell.is_revealed = true;
 
@@ -433,8 +428,21 @@ fn reveal_cell(
             return true;
         }
         _rest => {
-            *cells_revealed = *cells_revealed + recursive_reveal(reveal_x, reveal_y, grid);
+            recursive_reveal(reveal_x, reveal_y, grid);
             return false;
         }
     }
+}
+
+fn count_cells(grid: &MineGrid) -> usize {
+    let mut result: usize = 0;
+
+    for row in grid {
+        for cell in row {
+            if cell.is_revealed {
+                result += 1;
+            }
+        }
+    }
+    return result;
 }
